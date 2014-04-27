@@ -1,6 +1,7 @@
 <LPHEADER>
 <HTML>
-<HEAD>  
+<HEAD>
+  <!-- All references are remotely hosted so that the HTML is entirely portable. -->
 <link rel="stylesheet" type="text/css" href="http://cdn.datatables.net/1.9.4/css/jquery.dataTables.css">
 <link rel="stylesheet" type="text/css" href="http://www.datatables.net/release-datatables/extras/ColVis/media/css/ColVis.css">
 <!--<link rel="stylesheet" type="text/css" href="https://dl.dropboxusercontent.com/u/1258269/BlackbaudProjects/PerformanceLog/css.css">-->

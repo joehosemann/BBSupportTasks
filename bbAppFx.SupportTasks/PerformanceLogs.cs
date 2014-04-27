@@ -33,6 +33,7 @@ namespace bbAppFx.SupportTasks
         public string Database { get; set; }
         [Required]
         public string LogDestinationPath { get; set; }
+        public string ConnectString { get; set; }
         public bool Capture_SqlSnaps { get; set; }
         public bool Capture_IISLogs { get; set; }
         public bool Capture_EventLogs { get; set; }
@@ -216,7 +217,25 @@ namespace bbAppFx.SupportTasks
                 }
 
                 if (files.Count() == 0)
-                    Utility.MyLogMessage(this, "Found no updated IIS logs.", MessageImportance.Normal);
+                {
+                    Utility.MyLogMessage(this, "Found no updated IIS logs. This is likely due to a Windows bug surrounding the Last Modified attribute. Performing workaround.", MessageImportance.Normal);
+                    // Open a hidden windows explorer process to "observe" the file.  Historically, this has been a workaround to this issue.
+                    var startInfo = new System.Diagnostics.ProcessStartInfo(iisLogDirectory);
+                    startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+                    Process.Start(startInfo);
+                    // Try to find files again...
+                    files = new DirectoryInfo(iisLogDirectory).GetFiles().Where(log => log.LastWriteTime.Date >= _beginTimestamp.Date && log.LastWriteTime.Date <= _endTimestamp.Date);
+                    foreach (FileInfo file in files)
+                    {
+
+                        Utility.MyLogMessage(this, "Generating IIS log from date: " + file.CreationTime.Date.ToString(), MessageImportance.Normal);
+                        iisLogFiles.Add(file.FullName);
+                    }
+                    if (files.Count() == 0)
+                    {
+                        Utility.MyLogMessage(this, "IIS log workaround failed.  Either there are no logs, or you'll need to restart IIS and capture again.", MessageImportance.Normal);
+                    }
+                }
 
 
                 // Builds the Log Parser command.
@@ -233,10 +252,10 @@ namespace bbAppFx.SupportTasks
                         _endTimestamp.ToUniversalTime().ToString("yyyy-MM-dd"),
                         _beginTimestamp.ToUniversalTime().ToString("HH:mm:ss"),
                         _endTimestamp.ToUniversalTime().ToString("HH:mm:ss"),
-                        relativePath+"\\iistemplate.tpl"
+                        relativePath + "\\iistemplate.tpl"
                         );
 
-                    Utility.MyLogMessage(this, logParserCmd, MessageImportance.Normal);
+                    // Utility.MyLogMessage(this, logParserCmd, MessageImportance.Normal);
                     new Utilities().ExecuteCommandSync(@"netsh http flush logbuffer & " + logParserCmd, Environment.ExpandEnvironmentVariables("%PROGRAMFILES(x86)%\\Log Parser 2.2\\"));
 
                     i++;
@@ -251,24 +270,26 @@ namespace bbAppFx.SupportTasks
         private void CleanupSOAPLog()
         {
             Utility.MyLogMessage(this, "Restoring logrequests to blank value in bbAppFx web.config", MessageImportance.Normal);
-            new Utilities().ExecuteCommandSync(string.Format("appcmd.exe set config \"{0}\" -section:appSettings /[key='logrequests'].value:\"\"", IIS_SiteName), Environment.ExpandEnvironmentVariables("%systemroot%\\system32\\inetsrv\\"));
-            var cs = Regex.Match(File.ReadAllText(pathWebConfig), "connectionString=\"(.+" + Database + ".+)\"", RegexOptions.IgnoreCase).ToString().Replace("connectionString=\"", "").Replace("\"", "");
+            //new Utilities().ExecuteCommandSync(string.Format("appcmd.exe set config \"{0}\" -section:appSettings /[key='logrequests'].value:\"\"", IIS_SiteName), Environment.ExpandEnvironmentVariables("%systemroot%\\system32\\inetsrv\\"));
+            //var cs = Regex.Match(File.ReadAllText(pathWebConfig), "connectionString=\"(.+" + Database + ".+)\"", RegexOptions.IgnoreCase).ToString().Replace("connectionString=\"", "").Replace("\"", "");
 
-            var sqlConnection = new SqlConnection(cs);
+            var sqlConnection = new SqlConnection(this.ConnectString);
             try
             {
-                sqlConnection.Open();
-                var cmd = new SqlCommand(String.Format("select * from dbo.wsrequestlog where dateadded > '{0}' AND dateadded < '{1}' ",
-                    _beginTimestamp.ToString("yyyy-MM-dd HH:mm:ss"),
-                    _endTimestamp.ToString("yyyy-MM-dd HH:mm:ss")),
-                    sqlConnection);
+                using (SqlCommand sqlCommand = sqlConnection.CreateCommand())
+                {
+                    sqlCommand.CommandText = "select * from dbo.wsrequestlog where dateadded > @begin AND dateadded < @end";
+                    sqlCommand.Parameters.AddWithValue("@begin", _beginTimestamp.ToString("yyyy-MM-dd HH:mm:ss"));
+                    sqlCommand.Parameters.AddWithValue("@end", _endTimestamp.ToString("yyyy-MM-dd HH:mm:ss"));
+                    
+                    sqlCommand.Connection.Open();
+                    var reader = sqlCommand.ExecuteReader();
 
-                //Utility.MyLogMessage(this, cmd.CommandText, MessageImportance.Normal);
+                    Directory.CreateDirectory(_completedLogPath + @"\SOAPLog");
+                    var writer = new StreamWriter(_completedLogPath + @"\SOAPLog\SOAPLog.csv");
+                    Utilities.createCsvFile(reader, writer);
 
-                var reader = cmd.ExecuteReader();
-                Directory.CreateDirectory(_completedLogPath + @"\SOAPLog");
-                var writer = new StreamWriter(_completedLogPath + @"\SOAPLog\SOAPLog.csv");
-                Utilities.createCsvFile(reader, writer);
+                }
 
             }
             catch (Exception ex)
@@ -290,7 +311,7 @@ namespace bbAppFx.SupportTasks
             List<string> iisLogFiles = new List<string>();
             var logParserPath = "\"" + Environment.ExpandEnvironmentVariables("%PROGRAMFILES(x86)%\\Log Parser 2.2\\LogParser.exe") + "\"";
 
-            var logParserCmd = String.Format("\"{0} \"select * into '{1}' from {2} where TimeGenerated >= '{3} {4}' AND TimeGenerated <= '{5} {6}'\" -tpl:{7}\"",
+            var logParserCmd = String.Format("\"{0}  -tpl:\"{7}\" \"select * into '{1}' from {2} where TimeGenerated >= '{3} {4}' AND TimeGenerated <= '{5} {6}'\"\"",
                 logParserPath,
                 _completedLogPath + @"\EventViewerLogs\EventLog.html",
                 "Application",
@@ -298,8 +319,10 @@ namespace bbAppFx.SupportTasks
                 _beginTimestamp.ToString("HH:mm:ss"),
                 _endTimestamp.ToString("yyyy-MM-dd"),
                 _endTimestamp.ToString("HH:mm:ss"),
-                relativePath+"\\eventtemplate.tpl"
+                relativePath + "\\eventtemplate.tpl"
                 );
+
+            //Utility.MyLogMessage(this, logParserCmd, MessageImportance.Normal);
 
             new Utilities().ExecuteCommandSync(logParserCmd, "/");
         }

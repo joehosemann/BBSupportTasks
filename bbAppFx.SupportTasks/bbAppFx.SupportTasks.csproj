@@ -104,9 +104,9 @@
     <Compile Include="Utilities.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="iistemplate.tpl">
+    <EmbeddedResource Include="iistemplate.tpl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </EmbeddedResource>
     <None Include="packages.config" />
     <None Include="eventtemplate.tpl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

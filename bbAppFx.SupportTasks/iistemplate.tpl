@@ -1,9 +1,9 @@
 <LPHEADER>
 <HTML>
-<HEAD>  
+<HEAD>
+  <!-- All references are remotely hosted so that the HTML is entirely portable. -->
 <link rel="stylesheet" type="text/css" href="http://cdn.datatables.net/1.9.4/css/jquery.dataTables.css">
 <link rel="stylesheet" type="text/css" href="http://www.datatables.net/release-datatables/extras/ColVis/media/css/ColVis.css">
-<!--<link rel="stylesheet" type="text/css" href="https://dl.dropboxusercontent.com/u/1258269/BlackbaudProjects/PerformanceLog/css.css">-->
 <link rel="stylesheet" type="text/css" href="https://dl.dropboxusercontent.com/u/1258269/BlackbaudProjects/PerformanceLog/jquery-ui-1.10.4.custom.min.css">
 <script type="text/javascript" language="javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 <script type="text/javascript" language="javascript" src="https://dl.dropboxusercontent.com/u/1258269/BlackbaudProjects/PerformanceLog/jquery-ui-1.10.4.custom.min.js"></script>
@@ -19,9 +19,6 @@ $(document).ready(function () {
 		],
 		"iDisplayLength": 50,
 		"sDom": 'WR<"clear">Clfrtip',
-		"oColumnFilterWidgets": {
-			"aiExclude": [0,1,2,3,8,10,11,12,13,14,15]
-        }
     });
 });
 </script>
